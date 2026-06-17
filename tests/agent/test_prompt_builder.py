@@ -638,6 +638,24 @@ class TestBuildContextFilesPrompt:
         assert "Ruff for linting" in result
         assert "Project Context" in result
 
+    def test_agents_md_truncation_warning_includes_source_path(
+        self, tmp_path, monkeypatch
+    ):
+        def fake_load_config():
+            return {"context_file_max_chars": 120}
+
+        monkeypatch.setattr("hermes_cli.config.load_config", fake_load_config)
+        agents_path = tmp_path / "AGENTS.md"
+        agents_path.write_text("Use Ruff.\n" + "x" * 180, encoding="utf-8")
+
+        result = build_context_files_prompt(cwd=str(tmp_path), skip_soul=True)
+
+        warnings = drain_truncation_warnings()
+        assert len(warnings) == 1
+        assert str(agents_path.resolve()) in warnings[0]
+        assert "truncated AGENTS.md" in result
+        assert str(agents_path.resolve()) not in result
+
     def test_loads_cursorrules(self, tmp_path):
         (tmp_path / ".cursorrules").write_text("Always use type hints.")
         result = build_context_files_prompt(cwd=str(tmp_path))

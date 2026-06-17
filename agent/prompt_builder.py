@@ -1510,14 +1510,31 @@ def build_nous_subscription_prompt(valid_tool_names: "set[str] | None" = None) -
 # Context files (SOUL.md, AGENTS.md, .cursorrules)
 # =========================================================================
 
-def _truncate_content(content: str, filename: str, max_chars: Optional[int] = None) -> str:
+def _format_context_file_warning_label(
+    filename: str, source_path: Optional[Path] = None
+) -> str:
+    if source_path is None:
+        return filename
+    try:
+        return str(source_path.expanduser().resolve())
+    except Exception:
+        return str(source_path) or filename
+
+
+def _truncate_content(
+    content: str,
+    filename: str,
+    max_chars: Optional[int] = None,
+    source_path: Optional[Path] = None,
+) -> str:
     """Head/tail truncation with a marker in the middle."""
     if max_chars is None:
         max_chars = _get_context_file_max_chars()
     if len(content) <= max_chars:
         return content
+    warning_label = _format_context_file_warning_label(filename, source_path)
     msg = (
-        f"⚠️  Context file {filename} TRUNCATED: "
+        f"⚠️  Context file {warning_label} TRUNCATED: "
         f"{len(content)} chars exceeds limit of {max_chars} — "
         f"increase context_file_max_chars or trim the file!"
     )
@@ -1552,7 +1569,7 @@ def load_soul_md() -> Optional[str]:
         if not content:
             return None
         content = _scan_context_content(content, "SOUL.md")
-        content = _truncate_content(content, "SOUL.md")
+        content = _truncate_content(content, "SOUL.md", source_path=soul_path)
         return content
     except Exception as e:
         logger.debug("Could not read SOUL.md from %s: %s", soul_path, e)
@@ -1576,7 +1593,7 @@ def _load_hermes_md(cwd_path: Path) -> str:
             pass
         content = _scan_context_content(content, rel)
         result = f"## {rel}\n\n{content}"
-        return _truncate_content(result, ".hermes.md")
+        return _truncate_content(result, ".hermes.md", source_path=hermes_md_path)
     except Exception as e:
         logger.debug("Could not read %s: %s", hermes_md_path, e)
         return ""
@@ -1592,7 +1609,7 @@ def _load_agents_md(cwd_path: Path) -> str:
                 if content:
                     content = _scan_context_content(content, name)
                     result = f"## {name}\n\n{content}"
-                    return _truncate_content(result, "AGENTS.md")
+                    return _truncate_content(result, "AGENTS.md", source_path=candidate)
             except Exception as e:
                 logger.debug("Could not read %s: %s", candidate, e)
     return ""
@@ -1608,7 +1625,7 @@ def _load_claude_md(cwd_path: Path) -> str:
                 if content:
                     content = _scan_context_content(content, name)
                     result = f"## {name}\n\n{content}"
-                    return _truncate_content(result, "CLAUDE.md")
+                    return _truncate_content(result, "CLAUDE.md", source_path=candidate)
             except Exception as e:
                 logger.debug("Could not read %s: %s", candidate, e)
     return ""
